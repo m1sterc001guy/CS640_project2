@@ -314,14 +314,26 @@ void sr_handlepacket(struct sr_instance* sr,
      else{
         printf("CACHE MISS!\n");
      }
-     printf("IP from packet: ");
-     print_addr_ip_int(htonl(ip));
+     /*printf("IP from packet: ");*/
+     /*print_addr_ip_int(htonl(ip));*/
      /*print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));*/
-     /*sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req, struct sr_if *out_iface);*/
      /*sr_handlepacket_arp(struct sr_instance *sr, uint8_t *pkt, unsigned int len, struct sr_if *src_iface)*/
   }
   else if(ethtype == ethertype_ip){
      printf("This is an IP Packet!\n");
+     /*print_hdrs(packet, len);*/
+     /*first we must check if the ip packet is destined for one of the routers interfaces*/
+     /*get the destination ip address from the ip header*/
+     sr_ip_hdr_t *destination = (sr_ip_hdr_t *)(packet + (sizeof(sr_ethernet_hdr_t)));
+     struct sr_if *curr_entry = sr->if_list;
+     while(curr_entry != NULL){
+        /*compare the destination ip address with our interfaces to see if this ip packet is supposed to go to one of our interfaces*/
+        if(curr_entry->ip == destination->ip_dst){
+           printf("FOUND! This packet is destined for one of the routers interfaces");
+           /*TODO ADD logic for what happens when a packet comes to one of our interfaces*/
+        }
+        curr_entry = curr_entry->next;
+     }
   }
   else{
      printf("This packet type did not match any currently known packet types!\n");
@@ -332,10 +344,6 @@ void sr_handlepacket(struct sr_instance* sr,
   sr_print_routing_table(sr);
   printf("HEADERS: \n");
   print_hdrs(packet, len);
-  */
-  /*
-  printf("FORMATTED IP: \n");
-  print_addr_ip_int(
   */
 
   /*************************************************************************/
