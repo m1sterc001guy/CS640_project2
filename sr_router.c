@@ -249,7 +249,7 @@ void sr_handlepacket_arp(struct sr_instance *sr, uint8_t *pkt,
     {
       /*********************************************************************/
       /* TODO: send all packets on the req->packets linked list            */
-
+      printf("SEND ALL PACKETS ON THE req->packets linked list\n");
 
 
       /*********************************************************************/
@@ -293,8 +293,50 @@ void sr_handlepacket(struct sr_instance* sr,
 
   printf("*** -> Received packet of length %d \n",len);
 
+  /*our first job is to get the correct Ethertype from the ethernet header to figure out what to do with the packet*/
+  uint16_t ethtype = ethertype(packet);
+  if(ethtype == ethertype_arp){
+     printf("This is an ARP Packet!\n");
+     /*our next job is to retreive the ARP header of the packet so we can figure out which host this packet is trying to resolve*/
+     struct sr_rt *curr_entry = sr->routing_table;
+     while(curr_entry != NULL){
+        /*If the curr_entry is equal to the IP address in the routing table, then we need to forward this ARP packet to that to that host*/
+        curr_entry = curr_entry->next;  
+     }
+     /*printf("Hey! This packet didnt match any entry in our routing table, it must be ours\n");*/ 
+     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet + (sizeof(sr_ethernet_hdr_t)));
+     uint32_t ip = arp_hdr->ar_tip;
+     struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip);
+     if(arp_entry == NULL){
+        printf("CACHE HIT!\n");
+        sr_handlepacket_arp(sr, packet, len, sr_get_interface(sr, interface));
+     }
+     else{
+        printf("CACHE MISS!\n");
+     }
+     printf("IP from packet: ");
+     print_addr_ip_int(htonl(ip));
+     /*print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));*/
+     /*sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req, struct sr_if *out_iface);*/
+     /*sr_handlepacket_arp(struct sr_instance *sr, uint8_t *pkt, unsigned int len, struct sr_if *src_iface)*/
+  }
+  else if(ethtype == ethertype_ip){
+     printf("This is an IP Packet!\n");
+  }
+  else{
+     printf("This packet type did not match any currently known packet types!\n");
+  }
+
+  /*
+  printf("ROUTING TABLE: \n");
   sr_print_routing_table(sr);
+  printf("HEADERS: \n");
   print_hdrs(packet, len);
+  */
+  /*
+  printf("FORMATTED IP: \n");
+  print_addr_ip_int(
+  */
 
   /*************************************************************************/
   /* TODO: Handle packets                                                  */
