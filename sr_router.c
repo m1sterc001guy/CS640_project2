@@ -301,6 +301,7 @@ void sr_handlepacket(struct sr_instance* sr,
      struct sr_rt *curr_entry = sr->routing_table;
      while(curr_entry != NULL){
         /*If the curr_entry is equal to the IP address in the routing table, then we need to forward this ARP packet to that to that host*/
+        /*TODO Broadcast the ARP packet to the other hosts*/
         curr_entry = curr_entry->next;  
      }
      /*printf("Hey! This packet didnt match any entry in our routing table, it must be ours\n");*/ 
@@ -326,13 +327,18 @@ void sr_handlepacket(struct sr_instance* sr,
      /*get the destination ip address from the ip header*/
      sr_ip_hdr_t *destination = (sr_ip_hdr_t *)(packet + (sizeof(sr_ethernet_hdr_t)));
      struct sr_if *curr_entry = sr->if_list;
+     int found = 0;
      while(curr_entry != NULL){
         /*compare the destination ip address with our interfaces to see if this ip packet is supposed to go to one of our interfaces*/
         if(curr_entry->ip == destination->ip_dst){
+           found = 1;
            printf("FOUND! This packet is destined for one of the routers interfaces");
            /*TODO ADD logic for what happens when a packet comes to one of our interfaces*/
         }
         curr_entry = curr_entry->next;
+     }
+     if(!found){
+        
      }
   }
   else{
