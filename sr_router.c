@@ -309,11 +309,11 @@ void sr_handlepacket(struct sr_instance* sr,
      uint32_t ip = arp_hdr->ar_tip;
      struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip);
      if(arp_entry == NULL){
-        printf("CACHE HIT!\n");
+        printf("CACHE MISS!\n");
         sr_handlepacket_arp(sr, packet, len, sr_get_interface(sr, interface));
      }
      else{
-        printf("CACHE MISS!\n");
+        printf("CACHE HIT!\n");
      }
      /*printf("IP from packet: ");*/
      /*print_addr_ip_int(htonl(ip));*/
@@ -338,7 +338,21 @@ void sr_handlepacket(struct sr_instance* sr,
         curr_entry = curr_entry->next;
      }
      if(!found){
-        
+        int min_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t);
+        if(len < min_length){
+           fprintf(stderr, "This IP packet is not long enough!\n");
+           return;
+        }
+        /*check the checksum on this packet*/
+        int ip_header_length = sizeof(sr_ip_hdr_t);
+        uint16_t check_sum = cksum(destination, ip_header_length); 
+        if(check_sum != 0xffff){
+           fprintf(stderr, "Incorrect checksum. Dropping packet...\n");
+           return;
+        }
+        destination->ip_ttl--;
+        /*recompute the checksum for this packet*/
+        destination = cksum(destination, ip_header_length);
      }
   }
   else{
