@@ -298,10 +298,9 @@ void sr_handlepacket(struct sr_instance* sr,
   if(ethtype == ethertype_arp){
      printf("This is an ARP Packet!\n");
      /*our next job is to retreive the ARP header of the packet so we can figure out which host this packet is trying to resolve*/
+     /*this might not be necessary because we might only handle arp requests to the router, not to every host*/
      struct sr_rt *curr_entry = sr->routing_table;
      while(curr_entry != NULL){
-        /*If the curr_entry is equal to the IP address in the routing table, then we need to forward this ARP packet to that to that host*/
-        /*TODO Broadcast the ARP packet to the other hosts*/
         curr_entry = curr_entry->next;  
      }
      /*printf("Hey! This packet didnt match any entry in our routing table, it must be ours\n");*/ 
@@ -309,11 +308,11 @@ void sr_handlepacket(struct sr_instance* sr,
      uint32_t ip = arp_hdr->ar_tip;
      struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip);
      if(arp_entry == NULL){
-        printf("CACHE MISS!\n");
+        printf("ARP CACHE MISS!\n");
         sr_handlepacket_arp(sr, packet, len, sr_get_interface(sr, interface));
      }
      else{
-        printf("CACHE HIT!\n");
+        printf("ARP CACHE HIT!\n");
      }
      /*printf("IP from packet: ");*/
      /*print_addr_ip_int(htonl(ip));*/
@@ -357,17 +356,12 @@ void sr_handlepacket(struct sr_instance* sr,
         /*print the binary for an experiment*/
         uint32_t ip_dest = destination->ip_dst;
         char *iface_to_send;
+        uint32_t ip_to_send;
         int max_matching_bits = 0;
         int CHAR_BIT = 8; /*number of bits in a byte*/
         struct sr_rt *curr_entry = sr->routing_table; 
         while(curr_entry != NULL){
           uint32_t curr_ip = htonl(*(uint32_t *)&curr_entry->dest); 
-          /*
-          printf("curr_ip: \n");
-          print_addr_ip_int(htonl(curr_ip));
-          printf("ip_dest: \n");
-          print_addr_ip_int(htonl(ip_dest));
-          */
           int matching_bits = 0;
           int i;
           for(i = sizeof(ip_dest) * (CHAR_BIT-1); i >= 0; --i){
@@ -383,18 +377,22 @@ void sr_handlepacket(struct sr_instance* sr,
           if(matching_bits > max_matching_bits){
              max_matching_bits = matching_bits;
              iface_to_send = curr_entry->interface;
+             ip_to_send = curr_ip;
           }
           curr_entry = curr_entry->next;
         }
         printf("Interface to send: %s\n", iface_to_send);
-        /*
-        int CHAR_BIT = 8;
-        int i;
-        for(i = sizeof(ip_dest) * (CHAR_BIT-1); i >= 0; --i){
-            int ip_dest_bit = (ip_dest >> i) & 1;
-            printf("%d", ip_dest_bit); 
+        struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip_to_send);
+        if(arp_entry != NULL){
+           printf("IP -> ARP CACHE HIT\n");
+           /*send the packet to the next hop MAC address*/
         }
-        */
+        else{
+           printf("IP -> ARP CACHE MISS\n");
+           /*some sort of ARP stuff needs to happen here!!!*/
+           /*this pointer needs to be freed*/
+           /*struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), ip_to_send, packet, len, iface_to_send);*/
+        }
      }
   }
   else{
