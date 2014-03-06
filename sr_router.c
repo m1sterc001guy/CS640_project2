@@ -352,7 +352,49 @@ void sr_handlepacket(struct sr_instance* sr,
         }
         destination->ip_ttl--;
         /*recompute the checksum for this packet*/
-        destination = cksum(destination, ip_header_length);
+        destination->ip_sum = cksum(destination, ip_header_length);
+
+        /*print the binary for an experiment*/
+        uint32_t ip_dest = destination->ip_dst;
+        char *iface_to_send;
+        int max_matching_bits = 0;
+        int CHAR_BIT = 8; /*number of bits in a byte*/
+        struct sr_rt *curr_entry = sr->routing_table; 
+        while(curr_entry != NULL){
+          uint32_t curr_ip = htonl(*(uint32_t *)&curr_entry->dest); 
+          /*
+          printf("curr_ip: \n");
+          print_addr_ip_int(htonl(curr_ip));
+          printf("ip_dest: \n");
+          print_addr_ip_int(htonl(ip_dest));
+          */
+          int matching_bits = 0;
+          int i;
+          for(i = sizeof(ip_dest) * (CHAR_BIT-1); i >= 0; --i){
+              int ip_dest_bit = (ip_dest >> i) & 1;
+              int curr_entry_bit = (curr_ip >> i) & 1;
+              if(ip_dest_bit == curr_entry_bit){
+                 matching_bits++;
+              }
+              else{
+                 break;
+              }
+          }
+          if(matching_bits > max_matching_bits){
+             max_matching_bits = matching_bits;
+             iface_to_send = curr_entry->interface;
+          }
+          curr_entry = curr_entry->next;
+        }
+        printf("Interface to send: %s\n", iface_to_send);
+        /*
+        int CHAR_BIT = 8;
+        int i;
+        for(i = sizeof(ip_dest) * (CHAR_BIT-1); i >= 0; --i){
+            int ip_dest_bit = (ip_dest >> i) & 1;
+            printf("%d", ip_dest_bit); 
+        }
+        */
      }
   }
   else{
