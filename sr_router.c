@@ -170,7 +170,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       /*********************************************************************/
       /* TODO: send ICMP host uncreachable to the source address of all    */
       /* packets waiting on this request                                   */
-
+      printf("SEND ICMP host unreachable!!\n");
 
 
 
@@ -250,6 +250,13 @@ void sr_handlepacket_arp(struct sr_instance *sr, uint8_t *pkt,
       /*********************************************************************/
       /* TODO: send all packets on the req->packets linked list            */
       printf("SEND ALL PACKETS ON THE req->packets linked list\n");
+      struct sr_packet *curr_packet = req->packets; 
+      while(curr_packet != NULL){
+         print_hdrs(curr_packet->buf, curr_packet->len);
+         printf("Interface: %s\n", curr_packet->iface);
+         sr_send_packet(sr, curr_packet->buf, curr_packet->len, curr_packet->iface);
+         curr_packet = curr_packet->next;
+      }
 
 
       /*********************************************************************/
@@ -317,7 +324,6 @@ void sr_handlepacket(struct sr_instance* sr,
      /*printf("IP from packet: ");*/
      /*print_addr_ip_int(htonl(ip));*/
      /*print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));*/
-     /*sr_handlepacket_arp(struct sr_instance *sr, uint8_t *pkt, unsigned int len, struct sr_if *src_iface)*/
   }
   else if(ethtype == ethertype_ip){
      printf("This is an IP Packet!\n");
@@ -389,9 +395,10 @@ void sr_handlepacket(struct sr_instance* sr,
         }
         else{
            printf("IP -> ARP CACHE MISS\n");
-           /*some sort of ARP stuff needs to happen here!!!*/
-           /*this pointer needs to be freed*/
-           /*struct sr_arpreq *req = sr_arpcache_queuereq(&(sr->cache), ip_to_send, packet, len, iface_to_send);*/
+           printf("ip_to_send: \n");
+           print_addr_ip_int(ip_to_send);
+           printf("Interface: %s\n", iface_to_send);
+           sr_waitforarp(sr, packet, len, ntohl(ip_to_send), sr_get_interface(sr, iface_to_send)); 
         }
      }
   }
