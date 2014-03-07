@@ -252,6 +252,8 @@ void sr_handlepacket_arp(struct sr_instance *sr, uint8_t *pkt,
       printf("SEND ALL PACKETS ON THE req->packets linked list\n");
       struct sr_packet *curr_packet = req->packets; 
       sr_ethernet_hdr_t *arp_hdr = (sr_ethernet_hdr_t *)(pkt);
+      printf("ARP PACKET: \n");
+      print_hdrs(pkt, len);
       while(curr_packet != NULL){
          sr_ethernet_hdr_t *curr_ether = (sr_ethernet_hdr_t *)(curr_packet->buf);
          memcpy(curr_ether->ether_shost, arp_hdr->ether_dhost, sizeof(uint8_t) * ETHER_ADDR_LEN);
@@ -259,7 +261,7 @@ void sr_handlepacket_arp(struct sr_instance *sr, uint8_t *pkt,
          printf("PACKET TO SEND\n");
          print_hdrs(curr_packet->buf, curr_packet->len);
          printf("Interface: %s\n", curr_packet->iface);
-         /*sr_send_packet(sr, curr_packet->buf, curr_packet->len, curr_packet->iface);*/
+         sr_send_packet(sr, curr_packet->buf, curr_packet->len, curr_packet->iface);
          curr_packet = curr_packet->next;
       }
 
@@ -315,20 +317,8 @@ void sr_handlepacket(struct sr_instance* sr,
      while(curr_entry != NULL){
         curr_entry = curr_entry->next;  
      }
-     /*printf("Hey! This packet didnt match any entry in our routing table, it must be ours\n");*/ 
-     sr_arp_hdr_t *arp_hdr = (sr_arp_hdr_t *)(packet + (sizeof(sr_ethernet_hdr_t)));
-     uint32_t ip = arp_hdr->ar_tip;
-     struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip);
-     if(arp_entry == NULL){
-        printf("ARP CACHE MISS!\n");
-        sr_handlepacket_arp(sr, packet, len, sr_get_interface(sr, interface));
-     }
-     else{
-        printf("ARP CACHE HIT!\n");
-     }
-     /*printf("IP from packet: ");*/
+     sr_handlepacket_arp(sr, packet, len, sr_get_interface(sr, interface));
      /*print_addr_ip_int(htonl(ip));*/
-     /*print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));*/
   }
   else if(ethtype == ethertype_ip){
      printf("This is an IP Packet!\n");
