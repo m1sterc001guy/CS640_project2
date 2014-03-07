@@ -251,10 +251,15 @@ void sr_handlepacket_arp(struct sr_instance *sr, uint8_t *pkt,
       /* TODO: send all packets on the req->packets linked list            */
       printf("SEND ALL PACKETS ON THE req->packets linked list\n");
       struct sr_packet *curr_packet = req->packets; 
+      sr_ethernet_hdr_t *arp_hdr = (sr_ethernet_hdr_t *)(pkt);
       while(curr_packet != NULL){
+         sr_ethernet_hdr_t *curr_ether = (sr_ethernet_hdr_t *)(curr_packet->buf);
+         memcpy(curr_ether->ether_shost, arp_hdr->ether_dhost, sizeof(uint8_t) * ETHER_ADDR_LEN);
+         memcpy(curr_ether->ether_dhost, arp_hdr->ether_shost, sizeof(uint8_t) * ETHER_ADDR_LEN);
+         printf("PACKET TO SEND\n");
          print_hdrs(curr_packet->buf, curr_packet->len);
          printf("Interface: %s\n", curr_packet->iface);
-         sr_send_packet(sr, curr_packet->buf, curr_packet->len, curr_packet->iface);
+         /*sr_send_packet(sr, curr_packet->buf, curr_packet->len, curr_packet->iface);*/
          curr_packet = curr_packet->next;
       }
 
