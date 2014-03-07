@@ -311,6 +311,7 @@ void sr_handlepacket(struct sr_instance* sr,
   uint16_t ethtype = ethertype(packet);
   if(ethtype == ethertype_arp){
      printf("This is an ARP Packet!\n");
+     print_hdrs(packet, len);
      /*our next job is to retreive the ARP header of the packet so we can figure out which host this packet is trying to resolve*/
      /*this might not be necessary because we might only handle arp requests to the router, not to every host*/
      struct sr_rt *curr_entry = sr->routing_table;
@@ -322,7 +323,7 @@ void sr_handlepacket(struct sr_instance* sr,
   }
   else if(ethtype == ethertype_ip){
      printf("This is an IP Packet!\n");
-     /*print_hdrs(packet, len);*/
+     print_hdrs(packet, len);
      /*first we must check if the ip packet is destined for one of the routers interfaces*/
      /*get the destination ip address from the ip header*/
      sr_ip_hdr_t *destination = (sr_ip_hdr_t *)(packet + (sizeof(sr_ethernet_hdr_t)));
@@ -344,17 +345,17 @@ void sr_handlepacket(struct sr_instance* sr,
            return;
         }
         /*check the checksum on this packet*/
-        int ip_header_length = sizeof(sr_ip_hdr_t);
+        /*int ip_header_length = sizeof(sr_ip_hdr_t);
         uint16_t check_sum = cksum(destination, ip_header_length); 
         if(check_sum != 0xffff){
            fprintf(stderr, "Incorrect checksum. Dropping packet...\n");
            return;
         }
+        */
         destination->ip_ttl--;
         /*recompute the checksum for this packet*/
-        destination->ip_sum = cksum(destination, ip_header_length);
+        /*destination->ip_sum = cksum(destination, ip_header_length);*/
 
-        /*print the binary for an experiment*/
         uint32_t ip_dest = destination->ip_dst;
         char *iface_to_send;
         uint32_t ip_to_send;
