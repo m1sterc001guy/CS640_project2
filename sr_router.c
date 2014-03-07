@@ -352,7 +352,7 @@ void sr_handlepacket(struct sr_instance* sr,
            return;
         }
         */
-        destination->ip_ttl--;
+        /*destination->ip_ttl--;*/
         /*recompute the checksum for this packet*/
         /*destination->ip_sum = cksum(destination, ip_header_length);*/
 
