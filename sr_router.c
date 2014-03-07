@@ -356,7 +356,7 @@ void sr_handlepacket(struct sr_instance* sr,
         /*recompute the checksum for this packet*/
         /*destination->ip_sum = cksum(destination, ip_header_length);*/
 
-        uint32_t ip_dest = destination->ip_dst;
+        uint32_t ip_dest = htonl(destination->ip_dst);
         char *iface_to_send;
         uint32_t ip_to_send;
         int max_matching_bits = 0;
@@ -394,7 +394,7 @@ void sr_handlepacket(struct sr_instance* sr,
            printf("ip_to_send: \n");
            print_addr_ip_int(ip_to_send);
            printf("Interface: %s\n", iface_to_send);
-           sr_waitforarp(sr, packet, len, ntohl(ip_to_send), sr_get_interface(sr, iface_to_send)); 
+           sr_waitforarp(sr, packet, len, ntohl(ip_to_send), sr_get_interface(sr, iface_to_send));
         }
      }
   }
