@@ -200,26 +200,22 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       struct sr_packet *first_packet = req->packets;
       uint8_t *queued_packet = first_packet->buf;
       sr_ip_hdr_t *q_hdr = (sr_ip_hdr_t *)(queued_packet + sizeof(sr_ethernet_hdr_t));
-      ip_hdr->ip_src = out_iface->ip;
       ip_hdr->ip_dst = q_hdr->ip_src;
+      char *iface_to_send = get_longest_prefix_match(sr, htonl(ip_hdr->ip_dst));
+      ip_hdr->ip_src = sr_get_interface(sr, iface_to_send)->ip;
       ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));
 
       /*create ethernet header*/
       sr_ethernet_hdr_t *q_eth_hdr = (sr_ethernet_hdr_t *)(queued_packet);
       memcpy(ether_hdr->ether_dhost, q_eth_hdr->ether_shost, sizeof(uint8_t) * ETHER_ADDR_LEN);
-      memcpy(ether_hdr->ether_shost, out_iface->addr, sizeof(uint8_t) * ETHER_ADDR_LEN);
+      memcpy(ether_hdr->ether_shost, sr_get_interface(sr, iface_to_send)->addr, sizeof(uint8_t) * ETHER_ADDR_LEN);
       ether_hdr->ether_type = htons(ethertype_ip);
 
       printf("CANNOT REACH HOST\n");
       print_hdrs(packet, len);
 
-      /*
-      printf("Sizeof ethernet hdr: %lu\n", sizeof(sr_ethernet_hdr_t));
-      printf("Sizeof IP hdr: %lu\n", sizeof(sr_ip_hdr_t));
-      printf("Sizeof ICMP hdr: %lu\n", sizeof(sr_icmp_hdr_t));
-      */
-
-      /*sr_send_packet(sr, packet, len, curr_packet->iface);*/
+      printf("Sending packet over interface: %s of size: %d", iface_to_send, len);
+      /*sr_send_packet(sr, packet, len, iface_to_send);*/
 
       free(packet);
 
@@ -424,8 +420,9 @@ void sr_handlepacket(struct sr_instance* sr,
         /*recompute the checksum for this packet*/
         /*destination->ip_sum = cksum(destination, ip_header_length);*/
 
-        uint32_t ip_dest = destination->ip_dst;
-        char *iface_to_send = get_longest_prefix_match(sr, ip_dest); 
+        uint32_t ip_dest = htonl(destination->ip_dst);
+
+        char *iface_to_send = get_longest_prefix_match(sr, ip_dest);
         printf("Interface to send: %s\n", iface_to_send);
         struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip_dest);
         if(arp_entry != NULL){
@@ -480,7 +477,6 @@ int is_icmp(uint8_t ip_protocol){
 }
 
 char *get_longest_prefix_match(struct sr_instance *sr, uint32_t ip_dest){
-  ip_dest = htonl(ip_dest);
   char *iface_to_send;
   int max_matching_bits = 0;
   int CHAR_BIT = 8;
