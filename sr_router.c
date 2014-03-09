@@ -171,7 +171,8 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       /* TODO: send ICMP host uncreachable to the source address of all    */
       /* packets waiting on this request                                   */
       printf("SEND ICMP host unreachable!!\n");
-      uint8_t *packet = (uint8_t *)malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t)); 
+      int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t);
+      uint8_t *packet = (uint8_t *)malloc(len); 
       sr_ethernet_hdr_t *ether_hdr = (sr_ethernet_hdr_t *)packet;
       sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
       sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
@@ -203,6 +204,14 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       ip_hdr->ip_dst = htonl(q_hdr->ip_src);
       ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));
 
+      /*create ethernet header*/
+      sr_ethernet_hdr_t *q_eth_hdr = (sr_ethernet_hdr_t *)(queued_packet);
+      memcpy(ether_hdr->ether_dhost, q_eth_hdr->ether_shost, sizeof(uint8_t) * ETHER_ADDR_LEN);
+      memcpy(ether_hdr->ether_shost, out_iface->addr, sizeof(uint8_t) * ETHER_ADDR_LEN);
+      ether_hdr->ether_type = 0x0800;
+
+      printf("CANNOT REACH HOST\n");
+      print_hdrs(packet, len);
 
       /*
       printf("Sizeof ethernet hdr: %lu\n", sizeof(sr_ethernet_hdr_t));
