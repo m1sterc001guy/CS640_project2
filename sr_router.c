@@ -404,16 +404,27 @@ void sr_handlepacket(struct sr_instance* sr,
           curr_entry = curr_entry->next;
         }
         printf("Interface to send: %s\n", iface_to_send);
-        struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip_to_send);
+        struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), destination->ip_dst);
         if(arp_entry != NULL){
            printf("IP -> ARP CACHE HIT\n");
+	   printf("ARP ENTRY valid: %d\n", arp_entry->valid);
+	   uint32_t rentry_ip = arp_entry->ip;
+	   printf("Router entry IP: \n"); 
+	   print_addr_ip_int(htonl(rentry_ip));
+	   fprintf(stderr, "%.1x%.1x%.1x%.1x%.1x%.1x   \n", arp_entry->mac[0], arp_entry->mac[1], arp_entry->mac[2], arp_entry->mac[3], arp_entry->mac[4], arp_entry->mac[5]);
+	   memcpy(ether_hdr->ether_shost, &(sr_get_interface(sr, iface_to_send)->addr), sizeof(uint8_t));
+	   memcpy(ether_hdr->ether_dhost, arp_entry->mac, sizeof(uint8_t)); 
+	   print_hdrs(packet, len);
+	   sr_send_packet(sr, packet, len, iface_to_send);
         }
         else{
            printf("IP -> ARP CACHE MISS\n");
-           printf("ip_to_send: \n");
+           printf("ip_to_send: ");
            print_addr_ip_int(ip_to_send);
            printf("Interface: %s\n", iface_to_send);
-           sr_waitforarp(sr, packet, len, ntohl(ip_to_send), sr_get_interface(sr, iface_to_send));
+           sr_waitforarp(sr, packet, len, ntohl(ip_to_send), sr_get_interface(sr, iface_to_send)); 
+	   /*print cache*/
+	   /*sr_arpcache_dump(&(sr->cache));*/
         }
      }
      else if(ethtype == ethertype_arp){
