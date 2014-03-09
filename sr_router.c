@@ -306,39 +306,31 @@ void sr_handlepacket(struct sr_instance* sr,
   assert(interface);
 
   printf("*** -> Received packet of length %d \n",len);
-
-  /*our first job is to get the correct Ethertype from the ethernet header to figure out what to do with the packet*/
+  
+  struct sr_ethernet_hdr *ether_hdr = (struct sr_ethernet_hdr *)packet;
   uint16_t ethtype = ethertype(packet);
-  if(ethtype == ethertype_arp){
-     printf("This is an ARP Packet!\n");
-     print_hdrs(packet, len);
-     /*our next job is to retreive the ARP header of the packet so we can figure out which host this packet is trying to resolve*/
-     /*this might not be necessary because we might only handle arp requests to the router, not to every host*/
-     struct sr_rt *curr_entry = sr->routing_table;
-     while(curr_entry != NULL){
-        curr_entry = curr_entry->next;  
+  if(is_broadcast_packet(ether_hdr)){
+     if(ethtype == ethertype_arp){
+        printf("This is a BROADCAST ARP Packet!\n");
+        print_hdrs(packet, len);
+        sr_handlepacket_arp(sr, packet, len, sr_get_interface(sr, interface));
+        /*print_addr_ip_int(htonl(ip));*/
      }
-     sr_handlepacket_arp(sr, packet, len, sr_get_interface(sr, interface));
-     /*print_addr_ip_int(htonl(ip));*/
+     else{
+        fprintf(stderr, "ERROR: We got a broadcast packet that does not have an ARP header");
+        print_hdrs(packet, len);
+     }
   }
-  else if(ethtype == ethertype_ip){
-     printf("This is an IP Packet!\n");
+  else if(is_packet_addressed_to_router(sr, packet, interface)){
+     printf("This packet is addressed to the router!\n"); 
      print_hdrs(packet, len);
-     /*first we must check if the ip packet is destined for one of the routers interfaces*/
-     /*get the destination ip address from the ip header*/
-     sr_ip_hdr_t *destination = (sr_ip_hdr_t *)(packet + (sizeof(sr_ethernet_hdr_t)));
-     struct sr_if *curr_entry = sr->if_list;
-     int found = 0;
-     while(curr_entry != NULL){
-        /*compare the destination ip address with our interfaces to see if this ip packet is supposed to go to one of our interfaces*/
-        if(curr_entry->ip == destination->ip_dst){
-           found = 1;
-           printf("FOUND! This packet is destined for one of the routers interfaces");
-           /*TODO ADD logic for what happens when a packet comes to one of our interfaces*/
-        }
-        curr_entry = curr_entry->next;
-     }
-     if(!found){
+  }
+  else{
+     printf("This packet is NOT addressed to the router\n"); 
+     print_hdrs(packet, len);
+     /*forward the packet to the correct host*/
+     if(ethtype == ethertype_ip){
+        sr_ip_hdr_t *destination = (sr_ip_hdr_t *)(packet + (sizeof(sr_ethernet_hdr_t)));
         int min_length = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t);
         if(len < min_length){
            fprintf(stderr, "This IP packet is not long enough!\n");
@@ -360,7 +352,7 @@ void sr_handlepacket(struct sr_instance* sr,
         char *iface_to_send;
         uint32_t ip_to_send;
         int max_matching_bits = 0;
-        int CHAR_BIT = 8; /*number of bits in a byte*/
+        int CHAR_BIT = 8;
         struct sr_rt *curr_entry = sr->routing_table; 
         while(curr_entry != NULL){
           uint32_t curr_ip = htonl(*(uint32_t *)&curr_entry->dest); 
@@ -387,7 +379,6 @@ void sr_handlepacket(struct sr_instance* sr,
         struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip_to_send);
         if(arp_entry != NULL){
            printf("IP -> ARP CACHE HIT\n");
-           /*send the packet to the next hop MAC address*/
         }
         else{
            printf("IP -> ARP CACHE MISS\n");
@@ -397,24 +388,45 @@ void sr_handlepacket(struct sr_instance* sr,
            sr_waitforarp(sr, packet, len, ntohl(ip_to_send), sr_get_interface(sr, iface_to_send));
         }
      }
+     else if(ethtype == ethertype_arp){
+        sr_handlepacket_arp(sr, packet, len, sr_get_interface(sr, interface));
+     }
+     else{
+        fprintf(stderr, "ERROR: We received a packet destined for another host but it did not have an IP or ARP header");
+     }
   }
-  else{
-     printf("This packet type did not match any currently known packet types!\n");
-  }
-
-  /*
-  printf("ROUTING TABLE: \n");
-  sr_print_routing_table(sr);
-  printf("HEADERS: \n");
-  print_hdrs(packet, len);
-  */
-
-  /*************************************************************************/
-  /* TODO: Handle packets                                                  */
-
-
-
-  /*************************************************************************/
-
+ 
 }/* end sr_ForwardPacket */
+
+
+int is_broadcast_packet(struct sr_ethernet_hdr *ethernet_hdr){
+  int i;
+  for(i = 0; i < ETHER_ADDR_LEN; i++){
+      /*if any byte in the destination host is not 0xFF, then the packet is not a broadcast packet*/
+      if(ethernet_hdr->ether_dhost[i] != 0xFF){
+         return 0;
+      }
+  }
+  return 1;
+}
+
+int is_packet_addressed_to_router(struct sr_instance *sr, uint8_t *packet, char *interface){
+  sr_ip_hdr_t *destination = (sr_ip_hdr_t *)(packet + (sizeof(sr_ethernet_hdr_t)));
+  struct sr_if *curr_entry = sr->if_list;
+  while(curr_entry != NULL){
+     if(curr_entry->ip == destination->ip_dst){
+        return 1;
+     }
+     curr_entry = curr_entry->next;
+  }
+  return 0;
+}
+
+
+int is_icmp(uint8_t ip_protocol){
+  if(ip_protocol == ip_protocol_icmp){
+     return 1;
+  }
+  return 0;
+}
 

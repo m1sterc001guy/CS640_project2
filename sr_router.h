@@ -69,6 +69,9 @@ void sr_init(struct sr_instance* );
 void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
 void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
     struct sr_if *out_iface);
+int is_packet_addressed_to_router(struct sr_instance *sr, uint8_t *packet, char *interface);
+int is_broadcast_packet(struct sr_ethernet_hdr *ethernet_hdr);
+int is_icmp(uint8_t ip_protocol);
 
 /* -- sr_if.c -- */
 void sr_add_interface(struct sr_instance* , const char* );
