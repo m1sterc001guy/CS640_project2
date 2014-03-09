@@ -190,7 +190,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       ip_hdr->ip_hl = 5; /* 5 words*/
       ip_hdr->ip_v = 4;  /* IPv4*/ 
       ip_hdr->ip_tos = 0;
-      ip_hdr->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t);
+      ip_hdr->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));
       ip_hdr->ip_id = 0;
       ip_hdr->ip_off = 0;
       ip_hdr->ip_ttl = 64; /*arbitrarily assigned value*/
@@ -200,15 +200,15 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       struct sr_packet *first_packet = req->packets;
       uint8_t *queued_packet = first_packet->buf;
       sr_ip_hdr_t *q_hdr = (sr_ip_hdr_t *)(queued_packet + sizeof(sr_ethernet_hdr_t));
-      ip_hdr->ip_src = htonl(out_iface->ip);
-      ip_hdr->ip_dst = htonl(q_hdr->ip_src);
+      ip_hdr->ip_src = out_iface->ip;
+      ip_hdr->ip_dst = q_hdr->ip_src;
       ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));
 
       /*create ethernet header*/
       sr_ethernet_hdr_t *q_eth_hdr = (sr_ethernet_hdr_t *)(queued_packet);
       memcpy(ether_hdr->ether_dhost, q_eth_hdr->ether_shost, sizeof(uint8_t) * ETHER_ADDR_LEN);
       memcpy(ether_hdr->ether_shost, out_iface->addr, sizeof(uint8_t) * ETHER_ADDR_LEN);
-      ether_hdr->ether_type = 0x0800;
+      ether_hdr->ether_type = htons(ethertype_ip);
 
       printf("CANNOT REACH HOST\n");
       print_hdrs(packet, len);
@@ -218,6 +218,8 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       printf("Sizeof IP hdr: %lu\n", sizeof(sr_ip_hdr_t));
       printf("Sizeof ICMP hdr: %lu\n", sizeof(sr_icmp_hdr_t));
       */
+
+      /*sr_send_packet(sr, packet, len, curr_packet->iface);*/
 
       free(packet);
 
@@ -422,42 +424,15 @@ void sr_handlepacket(struct sr_instance* sr,
         /*recompute the checksum for this packet*/
         /*destination->ip_sum = cksum(destination, ip_header_length);*/
 
-        uint32_t ip_dest = htonl(destination->ip_dst);
-        char *iface_to_send;
-        uint32_t ip_to_send;
-        int max_matching_bits = 0;
-        int CHAR_BIT = 8;
-        struct sr_rt *curr_entry = sr->routing_table; 
-        while(curr_entry != NULL){
-          uint32_t curr_ip = htonl(*(uint32_t *)&curr_entry->dest); 
-          int matching_bits = 0;
-          int i;
-          for(i = sizeof(ip_dest) * (CHAR_BIT-1); i >= 0; --i){
-              int ip_dest_bit = (ip_dest >> i) & 1;
-              int curr_entry_bit = (curr_ip >> i) & 1;
-              if(ip_dest_bit == curr_entry_bit){
-                 matching_bits++;
-              }
-              else{
-                 break;
-              }
-          }
-          if(matching_bits > max_matching_bits){
-             max_matching_bits = matching_bits;
-             iface_to_send = curr_entry->interface;
-             ip_to_send = curr_ip;
-          }
-          curr_entry = curr_entry->next;
-        }
+        uint32_t ip_dest = destination->ip_dst;
+        char *iface_to_send = get_longest_prefix_match(sr, ip_dest); 
         printf("Interface to send: %s\n", iface_to_send);
-        struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip_to_send);
+        struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), ip_dest);
         if(arp_entry != NULL){
            printf("IP -> ARP CACHE HIT\n");
         }
         else{
            printf("IP -> ARP CACHE MISS\n");
-           printf("ip_to_send: \n");
-           print_addr_ip_int(ip_to_send);
            printf("Interface: %s\n", iface_to_send);
            sr_waitforarp(sr, packet, len, ntohl(ip_dest), sr_get_interface(sr, iface_to_send));
         }
@@ -502,5 +477,34 @@ int is_icmp(uint8_t ip_protocol){
      return 1;
   }
   return 0;
+}
+
+char *get_longest_prefix_match(struct sr_instance *sr, uint32_t ip_dest){
+  ip_dest = htonl(ip_dest);
+  char *iface_to_send;
+  int max_matching_bits = 0;
+  int CHAR_BIT = 8;
+  struct sr_rt *curr_entry = sr->routing_table; 
+  while(curr_entry != NULL){
+     uint32_t curr_ip = htonl(*(uint32_t *)&curr_entry->dest); 
+     int matching_bits = 0;
+     int i;
+     for(i = sizeof(ip_dest) * (CHAR_BIT-1); i >= 0; --i){
+        int ip_dest_bit = (ip_dest >> i) & 1;
+        int curr_entry_bit = (curr_ip >> i) & 1;
+        if(ip_dest_bit == curr_entry_bit){
+           matching_bits++;
+        }
+        else{
+           break;
+        }
+     }
+     if(matching_bits > max_matching_bits){
+        max_matching_bits = matching_bits;
+        iface_to_send = curr_entry->interface;
+     }
+     curr_entry = curr_entry->next;
+  }
+  return iface_to_send;
 }
 
