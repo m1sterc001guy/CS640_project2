@@ -172,7 +172,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       /* packets waiting on this request                                   */
       printf("SEND ICMP host unreachable!!\n");
       /*int padding_size = 46;*/
-      int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
+      int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t) + 8;
       uint8_t *packet = (uint8_t *)malloc(len); 
       sr_ethernet_hdr_t *ether_hdr = (sr_ethernet_hdr_t *)packet;
       sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
