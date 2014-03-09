@@ -171,26 +171,32 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       /* TODO: send ICMP host uncreachable to the source address of all    */
       /* packets waiting on this request                                   */
       printf("SEND ICMP host unreachable!!\n");
-      int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t);
+      /*int padding_size = 46;*/
+      int len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
       uint8_t *packet = (uint8_t *)malloc(len); 
       sr_ethernet_hdr_t *ether_hdr = (sr_ethernet_hdr_t *)packet;
       sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-      sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+      sr_icmp_t3_hdr_t *icmp_hdr = (sr_icmp_t3_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+      /*sr_icmp_t3_hdr_t *icmp_hdr = (sr_icmp_t3_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));*/
       
       /*create icmp header*/
-      const int ICMP_HOST_UNREACHABLE_TYPE = 3;
-      const int ICMP_HOST_UNREACHABLE_CODE = 1;
+      const uint8_t ICMP_HOST_UNREACHABLE_TYPE = 3;
+      const uint8_t ICMP_HOST_UNREACHABLE_CODE = 0;
       icmp_hdr->icmp_type = ICMP_HOST_UNREACHABLE_TYPE; 
       icmp_hdr->icmp_code = ICMP_HOST_UNREACHABLE_CODE;
       icmp_hdr->icmp_sum = 0x0000;
-      icmp_hdr->icmp_sum = cksum((uint16_t *)icmp_hdr, sizeof(sr_icmp_hdr_t)); 
+      memset(&(icmp_hdr->unused), 0, sizeof(uint16_t));
+      memset(&(icmp_hdr->next_mtu), 0, sizeof(uint16_t));
+      icmp_hdr->icmp_sum = cksum((uint16_t *)icmp_hdr, sizeof(sr_icmp_t3_hdr_t)); 
+
 
       /*create ip header*/
       /*some of these may be incorrect*/
       ip_hdr->ip_hl = 5; /* 5 words*/
       ip_hdr->ip_v = 4;  /* IPv4*/ 
       ip_hdr->ip_tos = 0;
-      ip_hdr->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));
+      ip_hdr->ip_len = htons(sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+      /*ip_hdr->ip_len = htons(84);*/
       ip_hdr->ip_id = 0;
       ip_hdr->ip_off = 0;
       ip_hdr->ip_ttl = 64; /*arbitrarily assigned value*/
@@ -203,7 +209,7 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       ip_hdr->ip_dst = q_hdr->ip_src;
       char *iface_to_send = get_longest_prefix_match(sr, htonl(ip_hdr->ip_dst));
       ip_hdr->ip_src = sr_get_interface(sr, iface_to_send)->ip;
-      ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));
+      ip_hdr->ip_sum = cksum((uint8_t *)ip_hdr, sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
 
       /*create ethernet header*/
       sr_ethernet_hdr_t *q_eth_hdr = (sr_ethernet_hdr_t *)(queued_packet);
@@ -211,11 +217,17 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       memcpy(ether_hdr->ether_shost, sr_get_interface(sr, iface_to_send)->addr, sizeof(uint8_t) * ETHER_ADDR_LEN);
       ether_hdr->ether_type = htons(ethertype_ip);
 
-      printf("CANNOT REACH HOST\n");
-      print_hdrs(packet, len);
+      
+      /*pad the rest of the packet because currently its too small*/
+      /*void *padding = (packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_hdr_t));*/
+      /*memset(padding, 0, padding_size);*/
+      /*memcpy(padding, (void *)ip_hdr, sizeof(sr_ip_hdr_t));*/
 
-      printf("Sending packet over interface: %s of size: %d", iface_to_send, len);
-      /*sr_send_packet(sr, packet, len, iface_to_send);*/
+      printf("CANNOT REACH HOST\n");
+
+      printf("Sending packet over interface: %s of size: %d\n", iface_to_send, len);
+      print_hdrs(packet, len);
+      sr_send_packet(sr, packet, len, iface_to_send);
 
       free(packet);
 
@@ -384,7 +396,10 @@ void sr_handlepacket(struct sr_instance* sr,
                destination->ip_src = destination->ip_dst;
                destination->ip_dst = client_ip_addr;
                icmp_hdr->icmp_type = 0;
+               /*icmp_hdr->icmp_sum = 0x0000;*/
+               icmp_hdr->icmp_sum = cksum((uint8_t *)icmp_hdr, sizeof(sr_icmp_hdr_t));
                /*will probably need to recompute the cksum here*/
+               printf("RESPONDING TO PING\n");
                print_hdrs(packet, len);
                sr_send_packet(sr, packet, len, interface);
             }
