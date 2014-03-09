@@ -324,6 +324,34 @@ void sr_handlepacket(struct sr_instance* sr,
   else if(is_packet_addressed_to_router(sr, packet, interface)){
      printf("This packet is addressed to the router!\n"); 
      print_hdrs(packet, len);
+     if(ethtype == ethertype_ip){
+        sr_ip_hdr_t *destination = (sr_ip_hdr_t *)(packet + (sizeof(sr_ethernet_hdr_t)));
+        if(is_icmp(destination->ip_p)){
+            const int ICMP_ECHO_REPLY = 8;
+            sr_icmp_hdr_t *icmp_hdr = (sr_icmp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));   
+            if(icmp_hdr->icmp_type == ICMP_ECHO_REPLY){
+               printf("Router received ping!!!\n");
+               uint8_t  client_ether_addr[ETHER_ADDR_LEN];
+               /*swap the the ether addrs and the ip addrs*/
+               memcpy(client_ether_addr, ether_hdr->ether_shost, sizeof(uint8_t) * ETHER_ADDR_LEN); 
+               memcpy(ether_hdr->ether_shost, ether_hdr->ether_dhost, sizeof(uint8_t) * ETHER_ADDR_LEN);
+               memcpy(ether_hdr->ether_dhost, client_ether_addr, sizeof(uint8_t) * ETHER_ADDR_LEN);
+               uint32_t client_ip_addr = destination->ip_src;
+               destination->ip_src = destination->ip_dst;
+               destination->ip_dst = client_ip_addr;
+               icmp_hdr->icmp_type = 0;
+               /*will probably need to recompute the cksum here*/
+               print_hdrs(packet, len);
+               sr_send_packet(sr, packet, len, interface);
+            }
+        }
+        else{
+           fprintf(stderr, "ERROR: Received an IP packet that is not ICMP");
+        }
+     }
+     else{
+        fprintf(stderr, "ERROR: Received a packet address to the router that is NOT IP");
+     }
   }
   else{
      printf("This packet is NOT addressed to the router\n"); 
