@@ -375,16 +375,24 @@ void sr_handlepacket(struct sr_instance* sr,
            return;
         }
         /*check the checksum on this packet*/
-        /*int ip_header_length = sizeof(sr_ip_hdr_t);
+        int ip_header_length = sizeof(sr_ip_hdr_t);
         uint16_t check_sum = cksum(destination, ip_header_length); 
         if(check_sum != 0xffff){
            fprintf(stderr, "Incorrect checksum. Dropping packet...\n");
            return;
         }
-        */
-        /*destination->ip_ttl--;*/
+        if(destination->ip_ttl == 0){
+           struct sr_packet *curr_packet = (struct sr_packet *)malloc(sizeof(struct sr_packet));
+           curr_packet->buf = packet;
+           curr_packet->len = len;
+           curr_packet->iface = interface;
+           send_icmp_message(sr, curr_packet, 11, 0);
+           return;
+        }
+        destination->ip_ttl--;
         /*recompute the checksum for this packet*/
-        /*destination->ip_sum = cksum(destination, ip_header_length);*/
+        destination->ip_sum = 0x0000;
+        destination->ip_sum = cksum(destination, ip_header_length);
 
         uint32_t ip_dest = htonl(destination->ip_dst);
 
