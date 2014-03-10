@@ -381,6 +381,14 @@ void sr_handlepacket(struct sr_instance* sr,
            fprintf(stderr, "Incorrect checksum. Dropping packet...\n");
            return;
         }
+        if(destination->ip_ttl == 0){
+           struct sr_packet *curr_packet = (struct sr_packet *)malloc(sizeof(struct sr_packet));
+           curr_packet->buf = packet;
+           curr_packet->len = len;
+           curr_packet->iface = interface;
+           send_icmp_message(sr, curr_packet, 11, 0);
+           return;
+        }
         destination->ip_ttl--;
         /*recompute the checksum for this packet*/
         destination->ip_sum = 0x0000;
