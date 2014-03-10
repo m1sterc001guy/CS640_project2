@@ -409,6 +409,7 @@ void sr_handlepacket(struct sr_instance* sr,
 	   memcpy(ether_hdr->ether_dhost, arp_entry->mac, ETHER_ADDR_LEN); 
 	   print_hdrs(packet, len);
 	   sr_send_packet(sr, packet, len, iface_to_send);
+	   free(arp_entry);
         }
         else{
            printf("IP -> ARP CACHE MISS\n");
