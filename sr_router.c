@@ -333,7 +333,6 @@ void sr_handlepacket(struct sr_instance* sr,
             if(icmp_hdr->icmp_type == ICMP_ECHO_REPLY){
                printf("Router received ping!!!\n");
                uint8_t  client_ether_addr[ETHER_ADDR_LEN];
-               /*swap the the ether addrs and the ip addrs*/
                memcpy(client_ether_addr, ether_hdr->ether_shost, sizeof(uint8_t) * ETHER_ADDR_LEN); 
                memcpy(ether_hdr->ether_shost, ether_hdr->ether_dhost, sizeof(uint8_t) * ETHER_ADDR_LEN);
                memcpy(ether_hdr->ether_dhost, client_ether_addr, sizeof(uint8_t) * ETHER_ADDR_LEN);
@@ -341,9 +340,9 @@ void sr_handlepacket(struct sr_instance* sr,
                destination->ip_src = destination->ip_dst;
                destination->ip_dst = client_ip_addr;
                icmp_hdr->icmp_type = 0;
-               /*icmp_hdr->icmp_sum = 0x0000;*/
+               icmp_hdr->icmp_sum = 0x0000;
+               icmp_hdr->icmp_code = 0;
                icmp_hdr->icmp_sum = cksum((uint8_t *)icmp_hdr, sizeof(sr_icmp_hdr_t));
-               /*will probably need to recompute the cksum here*/
                printf("RESPONDING TO PING\n");
                print_hdrs(packet, len);
                sr_send_packet(sr, packet, len, interface);
