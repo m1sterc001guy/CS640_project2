@@ -171,7 +171,10 @@ void sr_handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req,
       /* TODO: send ICMP host uncreachable to the source address of all    */
       /* packets waiting on this request                                   */
       struct sr_packet *curr_packet = req->packets;
-      send_icmp_message(sr, curr_packet, 3, 0);
+      while(curr_packet != NULL){
+         send_icmp_message(sr, curr_packet, 3, 0);
+         curr_packet = curr_packet->next;
+      }
 
       /*********************************************************************/
 
@@ -346,8 +349,14 @@ void sr_handlepacket(struct sr_instance* sr,
                sr_send_packet(sr, packet, len, interface);
             }
         }
-        else{
-           fprintf(stderr, "ERROR: Received an IP packet that is not ICMP");
+        else if(destination->ip_p == 6 || destination->ip_p == 17){
+           printf("Sending port unreachable icmp message!\n");
+           struct sr_packet *curr_packet = (struct sr_packet *)malloc(sizeof(struct sr_packet));
+           curr_packet->buf = packet;
+           curr_packet->len = len;
+           curr_packet->iface = interface;
+           send_icmp_message(sr, curr_packet, 3, 3);
+           free(curr_packet);
         }
      }
      else{
