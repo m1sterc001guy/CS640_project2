@@ -389,6 +389,14 @@ void sr_handlepacket(struct sr_instance* sr,
         uint32_t ip_dest = htonl(destination->ip_dst);
 
         char *iface_to_send = get_longest_prefix_match(sr, ip_dest);
+        if(iface_to_send == NULL){
+           struct sr_packet *curr_packet = (struct sr_packet *)malloc(sizeof(struct sr_packet));
+           curr_packet->buf = packet;
+           curr_packet->len = len;
+           curr_packet->iface = interface;
+           send_icmp_message(sr, curr_packet, 3, 0); 
+           return;
+        }
         printf("Interface to send: %s\n", iface_to_send);
         struct sr_arpentry *arp_entry = sr_arpcache_lookup(&(sr->cache), destination->ip_dst);
         if(arp_entry != NULL){
@@ -455,13 +463,18 @@ int is_icmp(uint8_t ip_protocol){
 char *get_longest_prefix_match(struct sr_instance *sr, uint32_t ip_dest){
   char *iface_to_send;
   int max_matching_bits = 0;
-  int CHAR_BIT = 8;
+  /*int CHAR_BIT = 8;*/
   struct sr_rt *curr_entry = sr->routing_table; 
+  printf("IP to compare: \n");
+  print_addr_ip_int(ip_dest);
   while(curr_entry != NULL){
      uint32_t curr_ip = htonl(*(uint32_t *)&curr_entry->dest); 
+     printf("Curr IP: \n");
+     print_addr_ip_int(curr_ip);
      int matching_bits = 0;
      int i;
-     for(i = sizeof(ip_dest) * (CHAR_BIT-1); i >= 0; --i){
+     /*printf("starting at: %lu\n", sizeof(ip_dest) * (CHAR_BIT-1));*/
+     for(i = 31; i >= 0; --i){
         int ip_dest_bit = (ip_dest >> i) & 1;
         int curr_entry_bit = (curr_ip >> i) & 1;
         if(ip_dest_bit == curr_entry_bit){
@@ -471,12 +484,18 @@ char *get_longest_prefix_match(struct sr_instance *sr, uint32_t ip_dest){
            break;
         }
      }
+     printf("matching bits: %d\n", matching_bits);
      if(matching_bits > max_matching_bits){
         max_matching_bits = matching_bits;
         iface_to_send = curr_entry->interface;
      }
      curr_entry = curr_entry->next;
   }
+
+  if(max_matching_bits != 32){
+     return NULL;
+  }
+
   return iface_to_send;
 }
 
